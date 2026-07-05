@@ -147,7 +147,7 @@ def base_config(user: str, password: str):
     de_pkgs, dm_service = de_select()
     if de_pkgs:
         print(f"\nInstalling Desktop Environment / Window Manager...")
-        run_command(["arch-chroot", "/mnt", "pacman", "-S", "--noconfirm", f"{de_pkgs}"])    
+        run_command(["arch-chroot", "/mnt", "su", "-", user, "-c", f"yay -S --noconfirm {de_pkgs}"])
 
     # Enable services
     run_command(["arch-chroot", "/mnt", "systemctl", "enable", dm_service])
