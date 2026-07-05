@@ -7,7 +7,7 @@
 ### [] Yay instalado por defecto para manejar paquetes
 ### [] Precompilar portproton para solamente instalarlo en el sistema
 ### [] Agregar repo de blackarch
-### [] Instalar kernel de cachyos-lts
+### [x] Instalar kernel de cachyos-lts
 ### [] Instalacion de herramientas para virtualizacion
 ### [] Instalar lenguajes de programacion
 ### [] Instalar ides
