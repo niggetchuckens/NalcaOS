@@ -138,7 +138,7 @@ def base_config(user: str, password: str):
     run_command(["arch-chroot", "/mnt", "su", "-", user, "-c", "cd ~/yay && makepkg -si --noconfirm"])
     run_command(["arch-chroot", "/mnt", "su", "-", user, "-c", "rm -rf ~/yay"])
     
-    run_command("rm /mnt/etc/sudoers.d/99-installer-nopasswd", shell=True)
+    
     
     # Install BlackArch repo
     run_command("arch-chroot /mnt bash -c 'curl -sO https://blackarch.org/strap.sh && chmod +x strap.sh && ./strap.sh && rm strap.sh'", shell=True)
@@ -148,7 +148,9 @@ def base_config(user: str, password: str):
     if de_pkgs:
         print(f"\nInstalling Desktop Environment / Window Manager...")
         run_command(["arch-chroot", "/mnt", "su", "-", user, "-c", f"yay -S --noconfirm {de_pkgs}"])
-
+    
+    run_command("rm /mnt/etc/sudoers.d/99-installer-nopasswd", shell=True)
+    
     # Enable services
     run_command(["arch-chroot", "/mnt", "systemctl", "enable", dm_service])
     run_command(["arch-chroot", "/mnt", "systemctl", "enable", "NetworkManager"])
