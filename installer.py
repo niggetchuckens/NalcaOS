@@ -1,4 +1,5 @@
 import os
+import shutil
 import sys
 import subprocess
 import argparse
@@ -159,7 +160,8 @@ def base_config(user: str, password: str):
     yay_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "binaries", "built", "yay.pkg.tar.zst"))
     dest_path = os.path.join("mnt", "home", user, "yay.pkg.tar.zst")
     os.makedirs(os.path.join("mnt", "home", user), exist_ok=True)
-    run_command(["cp", yay_path, dest_path])
+    shutil.copy2(yay_path, dest_path)
+    
     run_command(["arch-chroot", "/mnt", "pacman", "-U", "--noconfirm", f"/home/{user}/yay.pkg.tar.zst"])
     run_command(["arch-chroot", "/mnt", "rm", f"/home/{user}/yay.pkg.tar.zst"])
     
