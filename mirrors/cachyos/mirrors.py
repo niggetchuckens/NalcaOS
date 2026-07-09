@@ -157,22 +157,8 @@ def main():
     setup_keyring()
     install_cachyos_packages()
     append_cachyos_repos()
-    update_pacman()
+    # update_pacman()
     msg_print("CachyOS mirrors setup complete!")
-
-def nalca_install(root="/mnt", user: str = ""):
-    msg_print(f"Installing CachyOS mirrors into target {root} via arch-chroot...")
-    import shutil
-    script_path = os.path.abspath(__file__)
-    dest_path = os.path.join(root, "home", user, "mirrors.py")
-    os.makedirs(os.path.join(root, "home", user), exist_ok=True)
-    shutil.copy2(script_path, dest_path)
-    subprocess.run(["arch-chroot", root, f"/home/{user}/mirrors.py"], check=True)
-    try:
-        os.remove(dest_path)
-    except OSError:
-        pass
-    msg_print("CachyOS setup completed successfully.")
 
 if __name__ == "__main__":
     main()

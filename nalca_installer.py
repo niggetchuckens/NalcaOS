@@ -1,6 +1,10 @@
+import os
+import shutil
 import sys
 import subprocess
 import argparse
+
+from mirrors.blackarch.strap import msg_print
 
 def run_command(command, shell=False):
     try:
@@ -53,12 +57,7 @@ def set_disks():
     run_command(["mount", part1, "/mnt/boot"])
     
     
-def install_base(use_cachyos=False):
-    if use_cachyos:
-        print("Initializing CachyOS repositories...")
-        run_command(["python3", "mirrors/cachyos/mirrors.py", "--setup"])
-        print("Ranking CachyOS mirrors...")
-        run_command(["python3", "mirrors/cachyos/mirrors.py", "rank", "--apply", "--top", "5"])
+def install_base():
 
     cpu, gpu = None, None
     
@@ -137,20 +136,56 @@ def base_config(user: str, password: str):
     
     # Install BlackArch repo
     try:
-        import mirrors.blackarch.strap as blackarch
-        blackarch.nalca_install()
+        script = os.path.join(os.path.abspath(__file__), "mirrors", "blackarch", "strap.py")
+        dest_path = os.path.join("mnt", "home", user, "strap.py")
+        
+        print(f"Copying BlackArch mirrors into target /mnt via arch-chroot...")
+        
+        os.makedirs(os.path.join("mnt", "home", user), exist_ok=True)
+        shutil.copy2(script, dest_path)
+        
+        print(f"Running BlackArch setup script...")
+        
+        subprocess.run(["arch-chroot", "/mnt", f"python3 /home/{user}/strap.py"], check=True)
+        try:
+            print(f"Removing BlackArch setup script from target /mnt...")
+            os.remove(dest_path)
+        except OSError:
+            pass
+        print("BlackArch setup completed successfully.")
+        
     except ImportError as e:
         print(f"\033[1;31m[!] ERROR: Failed to import BlackArch setup: {e}\033[0m", file=sys.stderr)
         
     # Install CachyOS repo and LTS kernel
     try:
-        import mirrors.cachyos.mirrors as cachyos
-        cachyos.nalca_install()
-        run_command(["arch-chroot", "/mnt", "pacman", "-S", "--noconfirm", "linux-cachyos-lts", "linux-cachyos-lts-headers"])
+        print(f"Installing CachyOS mirrors via arch-chroot...")
+        
+        script = os.path.join(os.path.abspath(__file__), "mirrors", "cachyos", "mirrors.py")
+        dest_path = os.path.join("mnt", "home", user, "mirrors.py")
+    
+        print(f"Copying CachyOS setup script to target...")
+        
+        os.makedirs(os.path.join("mnt", "home", user), exist_ok=True)
+        shutil.copy2(script, dest_path)
+        
+        print(f"Running CachyOS setup script...")
+
+        subprocess.run(["arch-chroot", "mnt", f"python3 /home/{user}/mirrors.py"], check=True)
+        try:
+            print(f"Removing CachyOS setup script from target /mnt...")
+            os.remove(dest_path)
+        except OSError:
+            pass
+        
+        print("CachyOS setup completed successfully.")
         
     except ImportError as e:
         print(f"\033[1;31m[!] ERROR: Failed to import CachyOS setup: {e}\033[0m", file=sys.stderr)
 
+    # Update pacman and install LTS kernel
+    run_command(["arch-chroot", "/mnt", "pacman", "-Syyu", "--noconfirm"])
+    run_command(["arch-chroot", "/mnt", "pacman", "-S", "--noconfirm", "linux-cachyos-lts", "linux-cachyos-lts-headers"])
     
     # Setting up bootloader (GRUB)
     run_command(["arch-chroot", "/mnt", "pacman", "-S", "--noconfirm", "grub", "efibootmgr"])
@@ -164,15 +199,13 @@ def base_config(user: str, password: str):
     run_command(["arch-chroot", "/mnt", "su", "-", user, "-c", "cd ~/yay && makepkg -si --noconfirm"])
     run_command(["arch-chroot", "/mnt", "su", "-", user, "-c", "rm -rf ~/yay"])
     
-    
-    
-    
     # Install DE
     de_pkgs, dm_service = de_select()
     if de_pkgs:
         print(f"\nInstalling Desktop Environment / Window Manager...")
         run_command(["arch-chroot", "/mnt", "pacman", "-S", "--noconfirm", de_pkgs.strip().split()])
     
+    # Remove NOPASSWD from sudoers
     run_command("rm /mnt/etc/sudoers.d/99-installer-nopasswd", shell=True)
     
     # Enable services
@@ -180,14 +213,10 @@ def base_config(user: str, password: str):
     run_command(["arch-chroot", "/mnt", "systemctl", "enable", "NetworkManager"])
     run_command(["arch-chroot", "/mnt", "systemctl", "enable", "sshd"])
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="NalcaOS Base Installer")
-    parser.add_argument("--cachyos", action="store_true", help="Setup CachyOS repos and install CachyOS LTS kernel")
-    args = parser.parse_args()
-    
+if __name__ == "__main__":    
     configure_pacman()
     set_disks()
-    install_base(use_cachyos=args.cachyos)
+    install_base()
     base_config(
         user=input("\nEnter a username for the new user: ").strip(), 
         password=input("Enter a password for the new user: ").strip()
