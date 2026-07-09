@@ -197,7 +197,7 @@ def blackarch_setup():
             update_pacman_conf()
             
         msg_print('updating package databases')
-        # pacman_update()
+        pacman_update()
     finally:
         os.umask(old_umask)
         
@@ -213,6 +213,18 @@ def blackarch_setup():
     msg_print('You can install `blackarch-officials` metapackage with the most popular tools using the command below:')
     msg_print('sudo pacman -S --needed blackarch-officials')
 
+def nalca_install(root="/mnt", user: str = ""):
+    msg_print(f"Installing BlackArch mirrors into target {root} via arch-chroot...")
+    script_path = os.path.abspath(__file__)
+    dest_path = os.path.join(root, "home", user, "strap.py")
+    os.makedirs(os.path.join(root, "home", user), exist_ok=True)
+    shutil.copy2(script_path, dest_path)
+    subprocess.run(["arch-chroot", root, f"/home/{user}/strap.py"], check=True)
+    try:
+        os.remove(dest_path)
+    except OSError:
+        pass
+    msg_print("BlackArch setup completed successfully.")
 
 if __name__ == '__main__':
     blackarch_setup()

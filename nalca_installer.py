@@ -1,10 +1,6 @@
-import os
-import shutil
 import sys
 import subprocess
 import argparse
-
-from mirrors.blackarch.strap import msg_print
 
 def run_command(command, shell=False):
     try:
@@ -109,7 +105,7 @@ def de_select():
         case "5":
             return "sway swaybg swaylock swayidle waybar sddm alacritty dmenu", "sddm"
         case "6":
-            return "", "sddm"
+            return None, None
     
 
 def base_config(user: str, password: str):
@@ -136,56 +132,20 @@ def base_config(user: str, password: str):
     
     # Install BlackArch repo
     try:
-        script = os.path.join(os.path.abspath(__file__), "mirrors", "blackarch", "strap.py")
-        dest_path = os.path.join("mnt", "home", user, "strap.py")
-        
-        print(f"Copying BlackArch mirrors into target /mnt via arch-chroot...")
-        
-        os.makedirs(os.path.join("mnt", "home", user), exist_ok=True)
-        shutil.copy2(script, dest_path)
-        
-        print(f"Running BlackArch setup script...")
-        
-        subprocess.run(["arch-chroot", "/mnt", f"python3 /home/{user}/strap.py"], check=True)
-        try:
-            print(f"Removing BlackArch setup script from target /mnt...")
-            os.remove(dest_path)
-        except OSError:
-            pass
-        print("BlackArch setup completed successfully.")
-        
+        import mirrors.blackarch.strap as blackarch
+        blackarch.nalca_install()
     except ImportError as e:
         print(f"\033[1;31m[!] ERROR: Failed to import BlackArch setup: {e}\033[0m", file=sys.stderr)
         
     # Install CachyOS repo and LTS kernel
     try:
-        print(f"Installing CachyOS mirrors via arch-chroot...")
-        
-        script = os.path.join(os.path.abspath(__file__), "mirrors", "cachyos", "mirrors.py")
-        dest_path = os.path.join("mnt", "home", user, "mirrors.py")
-    
-        print(f"Copying CachyOS setup script to target...")
-        
-        os.makedirs(os.path.join("mnt", "home", user), exist_ok=True)
-        shutil.copy2(script, dest_path)
-        
-        print(f"Running CachyOS setup script...")
-
-        subprocess.run(["arch-chroot", "mnt", f"python3 /home/{user}/mirrors.py"], check=True)
-        try:
-            print(f"Removing CachyOS setup script from target /mnt...")
-            os.remove(dest_path)
-        except OSError:
-            pass
-        
-        print("CachyOS setup completed successfully.")
+        import mirrors.cachyos.mirrors as cachyos
+        cachyos.nalca_install()
+        run_command(["arch-chroot", "/mnt", "pacman", "-S", "--noconfirm", "linux-cachyos-lts", "linux-cachyos-lts-headers"])
         
     except ImportError as e:
         print(f"\033[1;31m[!] ERROR: Failed to import CachyOS setup: {e}\033[0m", file=sys.stderr)
 
-    # Update pacman and install LTS kernel
-    run_command(["arch-chroot", "/mnt", "pacman", "-Syyu", "--noconfirm"])
-    run_command(["arch-chroot", "/mnt", "pacman", "-S", "--noconfirm", "linux-cachyos-lts", "linux-cachyos-lts-headers"])
     
     # Setting up bootloader (GRUB)
     run_command(["arch-chroot", "/mnt", "pacman", "-S", "--noconfirm", "grub", "efibootmgr"])
@@ -201,19 +161,19 @@ def base_config(user: str, password: str):
     
     # Install DE
     de_pkgs, dm_service = de_select()
-    if de_pkgs:
+    if de_pkgs is not None and dm_service is not None:
         print(f"\nInstalling Desktop Environment / Window Manager...")
         run_command(["arch-chroot", "/mnt", "pacman", "-S", "--noconfirm", de_pkgs.strip().split()])
-    
-    # Remove NOPASSWD from sudoers
+        run_command(["arch-chroot", "/mnt", "systemctl", "enable", dm_service])
+
     run_command("rm /mnt/etc/sudoers.d/99-installer-nopasswd", shell=True)
     
     # Enable services
-    run_command(["arch-chroot", "/mnt", "systemctl", "enable", dm_service])
     run_command(["arch-chroot", "/mnt", "systemctl", "enable", "NetworkManager"])
     run_command(["arch-chroot", "/mnt", "systemctl", "enable", "sshd"])
 
-if __name__ == "__main__":    
+if __name__ == "__main__":
+    
     configure_pacman()
     set_disks()
     install_base()
