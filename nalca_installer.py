@@ -1,3 +1,4 @@
+import os
 import sys
 import subprocess
 import argparse
@@ -155,9 +156,15 @@ def base_config(user: str, password: str):
     # Install yay
     run_command(["arch-chroot", "/mnt", "chmod", "440", "/etc/sudoers.d/99-installer-nopasswd"])
     
-    run_command(["arch-chroot", "/mnt", "su", "-", user, "-c", "git clone https://aur.archlinux.org/yay.git ~/yay"])
-    run_command(["arch-chroot", "/mnt", "su", "-", user, "-c", "cd ~/yay && makepkg -si --noconfirm"])
-    run_command(["arch-chroot", "/mnt", "su", "-", user, "-c", "rm -rf ~/yay"])
+    yay_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "binaries", "built", "yay.pkg.tar.zst"))
+    dest_path = os.path.join("mnt", "home", user, "yay.pkg.tar.zst")
+    os.makedirs(os.path.join("mnt", "home", user), exist_ok=True)
+    run_command(["cp", yay_path, dest_path])
+    run_command(["arch-chroot", "/mnt", "pacman", "-U", "--noconfirm", f"/home/{user}/yay.pkg.tar.zst"])
+    run_command(["arch-chroot", "/mnt", "rm", f"/home/{user}/yay.pkg.tar.zst"])
+    
+    run_command("rm /mnt/etc/sudoers.d/99-installer-nopasswd", shell=True)
+    
     
     # Install DE
     de_pkgs, dm_service = de_select()
@@ -165,8 +172,6 @@ def base_config(user: str, password: str):
         print(f"\nInstalling Desktop Environment / Window Manager...")
         run_command(["arch-chroot", "/mnt", "pacman", "-S", "--noconfirm", de_pkgs.strip().split()])
         run_command(["arch-chroot", "/mnt", "systemctl", "enable", dm_service])
-
-    run_command("rm /mnt/etc/sudoers.d/99-installer-nopasswd", shell=True)
     
     # Enable services
     run_command(["arch-chroot", "/mnt", "systemctl", "enable", "NetworkManager"])
