@@ -4,14 +4,27 @@ import argparse
 
 def run_command(command, shell=False):
     try:
-        result = subprocess.run(command, shell=shell, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        if result.stdout:
-            print(result.stdout.decode().strip())
-    except subprocess.CalledProcessError as e:
-        if e.stderr:
-            print(f"Error: {e.stderr.decode().strip()}")
+        subprocess.run(command, shell=shell, check=True)
+    except subprocess.CalledProcessError:
         sys.exit(1)
              
+def configure_pacman():
+    print("Configuring Pacman (Enabling Colors, Parallel Downloads, and ILoveCandy)...")
+    try:
+        with open('/etc/pacman.conf', 'r') as f:
+            content = f.read()
+        
+        content = content.replace('#Color', 'Color')
+        content = content.replace('#ParallelDownloads', 'ParallelDownloads')
+        
+        if 'ILoveCandy' not in content:
+            content = content.replace('Color\n', 'Color\nILoveCandy\n')
+            
+        with open('/etc/pacman.conf', 'w') as f:
+            f.write(content)
+    except Exception as e:
+        print(f"Warning: Could not configure pacman.conf: {e}")
+
 def set_disks():              
     print("Available disks:")
     run_command("lsblk -d -n -o NAME,SIZE,MODEL | grep -v 'loop'", shell=True)
@@ -43,9 +56,9 @@ def set_disks():
 def install_base(use_cachyos=False):
     if use_cachyos:
         print("Initializing CachyOS repositories...")
-        run_command(["python3", "manage_mirrors.py", "setup-live"])
+        run_command(["python3", "mirrors/cachyos/mirrors.py", "--setup"])
         print("Ranking CachyOS mirrors...")
-        run_command(["python3", "manage_mirrors.py", "rank", "--apply", "--top", "5"])
+        run_command(["python3", "mirrors/cachyos/mirrors.py", "rank", "--apply", "--top", "5"])
 
     cpu, gpu = None, None
     
@@ -68,11 +81,6 @@ def install_base(use_cachyos=False):
             gpu = "nvidia-dkms nvidia-utils"
     
     pkgs = f"base linux-firmware base-devel git curl wget networkmanager sudo vim nano openssh python {cpu} {gpu} "
-    
-    if use_cachyos:
-        pkgs += "linux-cachyos-lts linux-cachyos-lts-headers cachyos-keyring cachyos-mirrorlist "
-    else:
-        pkgs += "linux linux-headers "
     
     print(f"Installing base packages: {pkgs}")
     run_command(["pacstrap", "-K", "/mnt"] + pkgs.strip().split())
@@ -102,7 +110,7 @@ def de_select():
         case "5":
             return "sway swaybg swaylock swayidle waybar sddm alacritty dmenu", "sddm"
         case "6":
-            return "", None
+            return "", "sddm"
     
 
 def base_config(user: str, password: str):
@@ -124,14 +132,33 @@ def base_config(user: str, password: str):
     run_command(["arch-chroot", "/mnt", "sed", "-i", "s/^# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/", "/etc/sudoers"])
     run_command(["arch-chroot", "/mnt", "sed", "-i", "s/^# %wheel ALL=(ALL) ALL/%wheel ALL=(ALL) ALL/", "/etc/sudoers"])
     
+    # Give NOPASSWD temporarily so blackarch, cachy-mirrors and yay can install dependencies non-interactively
+    run_command("echo '%wheel ALL=(ALL) NOPASSWD: ALL' > /mnt/etc/sudoers.d/99-installer-nopasswd", shell=True)
+    
+    # Install BlackArch repo
+    try:
+        import mirrors.blackarch.strap as blackarch
+        blackarch.nalca_install()
+    except ImportError as e:
+        print(f"\033[1;31m[!] ERROR: Failed to import BlackArch setup: {e}\033[0m", file=sys.stderr)
+        
+    # Install CachyOS repo and LTS kernel
+    try:
+        import mirrors.cachyos.mirrors as cachyos
+        cachyos.nalca_install()
+        run_command(["arch-chroot", "/mnt", "pacman", "-S", "--noconfirm", "linux-cachyos-lts", "linux-cachyos-lts-headers"])
+        run_command(["arch-chroot", "/mnt", "pacman", "-Rss", "--noconfirm", "linux", "linux-headers"])
+        
+    except ImportError as e:
+        print(f"\033[1;31m[!] ERROR: Failed to import CachyOS setup: {e}\033[0m", file=sys.stderr)
+
+    
     # Setting up bootloader (GRUB)
     run_command(["arch-chroot", "/mnt", "pacman", "-S", "--noconfirm", "grub", "efibootmgr"])
     run_command(["arch-chroot", "/mnt", "grub-install", "--target=x86_64-efi", "--efi-directory=/boot", "--bootloader-id=GRUB"])
     run_command(["arch-chroot", "/mnt", "grub-mkconfig", "-o", "/boot/grub/grub.cfg"])
     
     # Install yay
-    # Give NOPASSWD temporarily so yay can install dependencies non-interactively
-    run_command("echo '%wheel ALL=(ALL) NOPASSWD: ALL' > /mnt/etc/sudoers.d/99-installer-nopasswd", shell=True)
     run_command(["arch-chroot", "/mnt", "chmod", "440", "/etc/sudoers.d/99-installer-nopasswd"])
     
     run_command(["arch-chroot", "/mnt", "su", "-", user, "-c", "git clone https://aur.archlinux.org/yay.git ~/yay"])
@@ -140,14 +167,12 @@ def base_config(user: str, password: str):
     
     
     
-    # Install BlackArch repo
-    run_command("arch-chroot /mnt bash -c 'curl -sO https://blackarch.org/strap.sh && chmod +x strap.sh && ./strap.sh && rm strap.sh'", shell=True)
     
     # Install DE
     de_pkgs, dm_service = de_select()
     if de_pkgs:
         print(f"\nInstalling Desktop Environment / Window Manager...")
-        run_command(["arch-chroot", "/mnt", "su", "-", user, "-c", f"yay -S --noconfirm {de_pkgs}"])
+        run_command(["arch-chroot", "/mnt", "pacman", "-S", "--noconfirm", de_pkgs.strip().split()])
     
     run_command("rm /mnt/etc/sudoers.d/99-installer-nopasswd", shell=True)
     
@@ -161,6 +186,7 @@ if __name__ == "__main__":
     parser.add_argument("--cachyos", action="store_true", help="Setup CachyOS repos and install CachyOS LTS kernel")
     args = parser.parse_args()
     
+    configure_pacman()
     set_disks()
     install_base(use_cachyos=args.cachyos)
     base_config(
