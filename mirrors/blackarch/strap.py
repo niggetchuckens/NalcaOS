@@ -219,7 +219,7 @@ def nalca_install(root="/mnt"):
     dest_path = os.path.join(root, "tmp", "strap.py")
     os.makedirs(os.path.join(root, "tmp"), exist_ok=True)
     shutil.copy2(script_path, dest_path)
-    subprocess.run(["arch-chroot", root, "chmod", "+x", "/tmp/strap.py"], check=True)
+    # subprocess.run(["arch-chroot", root, "chmod", "+x", "/tmp/strap.py"], check=True)
     subprocess.run(["arch-chroot", root, "/tmp/strap.py"], check=True)
     try:
         os.remove(dest_path)

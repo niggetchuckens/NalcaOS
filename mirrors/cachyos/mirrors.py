@@ -167,7 +167,7 @@ def nalca_install(root="/mnt"):
     dest_path = os.path.join(root, "tmp", "mirrors.py")
     os.makedirs(os.path.join(root, "tmp"), exist_ok=True)
     shutil.copy2(script_path, dest_path)
-    subprocess.run(["arch-chroot", root, "chmod", "+x", "/tmp/mirrors.py"], check=True)
+    # subprocess.run(["arch-chroot", root, "chmod", "+x", "/tmp/mirrors.py"], check=True)
     subprocess.run(["arch-chroot", root, "/tmp/mirrors.py"], check=True)
     try:
         os.remove(dest_path)
