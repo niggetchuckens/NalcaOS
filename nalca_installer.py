@@ -147,7 +147,6 @@ def base_config(user: str, password: str):
         import mirrors.cachyos.mirrors as cachyos
         cachyos.nalca_install()
         run_command(["arch-chroot", "/mnt", "pacman", "-S", "--noconfirm", "linux-cachyos-lts", "linux-cachyos-lts-headers"])
-        run_command(["arch-chroot", "/mnt", "pacman", "-Rss", "--noconfirm", "linux", "linux-headers"])
         
     except ImportError as e:
         print(f"\033[1;31m[!] ERROR: Failed to import CachyOS setup: {e}\033[0m", file=sys.stderr)
