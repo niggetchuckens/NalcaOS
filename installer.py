@@ -3,6 +3,7 @@ import shutil
 import sys
 import subprocess
 import argparse
+import glob
 
 def run_command(command, shell=False):
     try:
@@ -154,17 +155,18 @@ def base_config(user: str, password: str):
     run_command(["arch-chroot", "/mnt", "grub-install", "--target=x86_64-efi", "--efi-directory=/boot", "--bootloader-id=GRUB"])
     run_command(["arch-chroot", "/mnt", "grub-mkconfig", "-o", "/boot/grub/grub.cfg"])
     
-    # Install yay
+    # Install precompiled binaries (yay, portproton, etc.)
     run_command(["arch-chroot", "/mnt", "chmod", "440", "/etc/sudoers.d/99-installer-nopasswd"])
     
-    yay_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "binaries", "built", "yay.pkg.tar.zst"))
-    dest_path = os.path.join("mnt", "home", user, "yay.pkg.tar.zst")
-    os.makedirs(os.path.join("mnt", "home", user), exist_ok=True)
+    bin_src = os.path.join(os.path.dirname(__file__), "binaries", "built")
+    bin_dest = os.path.join("/mnt", "home", user)
+    os.makedirs(bin_dest, exist_ok=True)
     
-    run_command(["cp", yay_path, os.path.join("mnt", "home", user, "yay.pkg.tar.zst")])
-    
-    run_command(["arch-chroot", "/mnt", "pacman", "-U", "--noconfirm", f"/home/{user}/yay.pkg.tar.zst"])
-    run_command(["arch-chroot", "/mnt", "rm", f"/home/{user}/yay.pkg.tar.zst"])
+    for pkg in glob.glob(os.path.join(bin_src, "*.pkg.tar.zst")):
+        pkg_name = os.path.basename(pkg)
+        run_command(["cp", pkg, os.path.join(bin_dest, pkg_name)])
+        run_command(["arch-chroot", "/mnt", "pacman", "-U", "--noconfirm", f"/home/{user}/{pkg_name}"])
+        run_command(["arch-chroot", "/mnt", "rm", f"/home/{user}/{pkg_name}"])
     
     run_command("rm /mnt/etc/sudoers.d/99-installer-nopasswd", shell=True)
     
