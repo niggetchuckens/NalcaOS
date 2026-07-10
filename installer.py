@@ -131,6 +131,7 @@ def base_config(user: str, password: str):
     
     # Give NOPASSWD temporarily so blackarch, cachy-mirrors and yay can install dependencies non-interactively
     run_command("echo '%wheel ALL=(ALL) NOPASSWD: ALL' > /mnt/etc/sudoers.d/99-installer-nopasswd", shell=True)
+    run_command(["arch-chroot", "/mnt", "chmod", "440", "/etc/sudoers.d/99-installer-nopasswd"])
     
     # Install BlackArch repo
     try:
@@ -155,19 +156,26 @@ def base_config(user: str, password: str):
     run_command(["arch-chroot", "/mnt", "grub-mkconfig", "-o", "/boot/grub/grub.cfg"])
     
     # Install yay
-    run_command(["arch-chroot", "/mnt", "chmod", "440", "/etc/sudoers.d/99-installer-nopasswd"])
-    
     yay_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "binaries", "built", "yay.pkg.tar.zst"))
-    dest_path = os.path.join("mnt", "home", user, "yay.pkg.tar.zst")
-    os.makedirs(os.path.join("mnt", "home", user), exist_ok=True)
+    dest_path = os.path.join("/mnt", "home", user, "yay.pkg.tar.zst")
+    os.makedirs(os.path.join("/mnt", "home", user), exist_ok=True)
     
-    run_command(["cp", yay_path, os.path.join("mnt", "home", user, "yay.pkg.tar.zst")])
+    run_command(["cp", yay_path, dest_path])
     
-    run_command(["arch-chroot", "/mnt", "pacman", "-U", "--noconfirm", f"/home/{user}/yay.pkg.tar.zst"])
-    run_command(["arch-chroot", "/mnt", "rm", f"/home/{user}/yay.pkg.tar.zst"])
+    run_command(["arch-chroot", "/mnt", "pacman", "-U", "--noconfirm", dest_path.replace("/mnt", "")])
+    run_command(["arch-chroot", "/mnt", "rm", dest_path.replace("/mnt", "")])
     
-    run_command("rm /mnt/etc/sudoers.d/99-installer-nopasswd", shell=True)
+    # Install PortProton
+    portproton_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "binaries", "built", "portproton.pkg.tar.zst"))
+    dest_path = os.path.join("/mnt", "home", user, "portproton.pkg.tar.zst")
+    os.makedirs(os.path.join("/mnt", "home", user), exist_ok=True)
     
+    run_command(["cp", portproton_path, dest_path])
+    run_command(["arch-chroot", "/mnt", "pacman", "-U", "--noconfirm", dest_path.replace("/mnt", "")])
+    run_command(["arch-chroot", "/mnt", "rm", dest_path.replace("/mnt", "")])
+    
+    # Remove NOPASSWD from sudoers
+    run_command(["arch-chroot", "/mnt", "rm", "/etc/sudoers.d/99-installer-nopasswd"])
     
     # Install DE
     de_pkgs, dm_service = de_select()
