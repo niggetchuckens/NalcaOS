@@ -11,7 +11,7 @@ def run_command(command, shell=False):
         sys.exit(1)
              
 def configure_pacman():
-    print("Configuring Pacman (Enabling Colors, Parallel Downloads, and ILoveCandy)...")
+    print("Configuring Pacman (Enabling Colors, Parallel Downloads, ILoveCandy and Multilib)...")
     try:
         with open('/etc/pacman.conf', 'r') as f:
             content = f.read()
@@ -21,6 +21,9 @@ def configure_pacman():
         
         if 'ILoveCandy' not in content:
             content = content.replace('Color\n', 'Color\nILoveCandy\n')
+            
+        if '#[multilib]' in content:
+            content = content.replace('#[multilib]\n#Include = /etc/pacman.d/mirrorlist', '[multilib]\nInclude = /etc/pacman.d/mirrorlist')
             
         with open('/etc/pacman.conf', 'w') as f:
             f.write(content)
