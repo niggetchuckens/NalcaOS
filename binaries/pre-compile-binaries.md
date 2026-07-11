@@ -10,18 +10,37 @@ Ensure you have `git` and the base development tools required to build Arch pack
 sudo pacman -S --needed git base-devel
 ```
 
-### Step 2: Clone the PKGBUILD repository
+### Step 2: Enable the `multilib` repository
+The PortProton PKGBUILD requires several 32-bit (`lib32-*`) dependencies. These packages are found in the `multilib` repository, which needs to be enabled in Arch Linux.
 
-### Step 3: Enter the cloned directory
+Open `/etc/pacman.conf` in your preferred text editor with `sudo` (e.g., `sudo nano /etc/pacman.conf`) and ensure the following two lines are uncommented (remove the `#` at the beginning):
+```ini
+[multilib]
+Include = /etc/pacman.d/mirrorlist
+```
+After making changes, update your system databases:
+```bash
+sudo pacman -Sy
+```
 
-### Step 4: Build the package
-Use the `makepkg` command to build the package. 
+### Step 3: Enter the PKGBUILD directory
+Navigate to the directory where your PKGBUILD is located:
+```bash
+cd /home/hime/code/nalcaos/binaries/to-build/PortProton_PKGBUILD
+```
 
-- To **build the package and install it immediately** along with any missing dependencies, run:
+### Step 4: Build the package with dependencies
+To compile the package and automatically resolve and install all missing dependencies, run:
+```bash
+makepkg -s
+```
+*(Note: The `-s` or `--syncdeps` flag tells `makepkg` to automatically use `pacman` to install any missing dependencies listed in the PKGBUILD file. It will prompt you for your `sudo` password to install those dependencies).*
+
+- To **build the package and install it immediately** once the build finishes successfully, you can add the `-i` flag:
   ```bash
   makepkg -si
   ```
-- To **only build the package** (to create the `.pkg.tar.zst` / `.pkg.tar.xz` file so you can distribute or install it later manually), run:
+- To **only build the package** and clean up leftover build files, run:
   ```bash
   makepkg -sc
   ```
@@ -29,7 +48,7 @@ Use the `makepkg` command to build the package.
 *(Note: Arch Linux builds `.pkg.tar.zst` by default for better compression speed, but it functions exactly the same as the older `.pkg.tar.xz` format).*
 
 ### Step 5 (Optional): Install the generated package manually
-If you used `makepkg -sc` in step 4 and just want to install the resulting package file manually later, you can do so with pacman:
+If you used `makepkg -sc` or `makepkg -s` in step 4 and just want to install the resulting package file manually later, you can do so with pacman:
 ```bash
 sudo pacman -U *.pkg.tar.zst
 ```
