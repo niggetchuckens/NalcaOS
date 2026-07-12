@@ -169,13 +169,13 @@ def base_config(user: str, password: str):
     run_command(["arch-chroot", "/mnt", "rm", dest_path.replace("/mnt", "")])
     
     # Install PortProton
-    portproton_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "binaries", "built", "portproton.pkg.tar.zst"))
-    dest_path = os.path.join("/mnt", "home", user, "portproton.pkg.tar.zst")
-    os.makedirs(os.path.join("/mnt", "home", user), exist_ok=True)
+    # portproton_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "binaries", "built", "portproton.pkg.tar.zst"))
+    # dest_path = os.path.join("/mnt", "home", user, "portproton.pkg.tar.zst")
+    # os.makedirs(os.path.join("/mnt", "home", user), exist_ok=True)
     
-    run_command(["cp", portproton_path, dest_path])
-    run_command(["arch-chroot", "/mnt", "pacman", "-U", "--noconfirm", dest_path.replace("/mnt", "")])
-    run_command(["arch-chroot", "/mnt", "rm", dest_path.replace("/mnt", "")])
+    # run_command(["cp", portproton_path, dest_path])
+    # run_command(["arch-chroot", "/mnt", "pacman", "-U", "--noconfirm", dest_path.replace("/mnt", "")])
+    # run_command(["arch-chroot", "/mnt", "rm", dest_path.replace("/mnt", "")])
     
     # Remove NOPASSWD from sudoers
     run_command(["arch-chroot", "/mnt", "rm", "/etc/sudoers.d/99-installer-nopasswd"])
