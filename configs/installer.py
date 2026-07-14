@@ -8,7 +8,7 @@ class Installer:
         self.user = user or input("Enter your username: ").strip()
         self.password = password or input("Enter your password: ").strip()
         self.working_dir = os.path.dirname(os.path.abspath(__file__))
-        self.configs_dir = os.path.join(self.working_dir, "configs"); sys.path.append(self.configs_dir)
+        # self.configs_dir = os.path.join(self.working_dir, "configs"); sys.path.append(self.configs_dir)
         self.mirrors_dir = os.path.join(self.working_dir, "mirrors"); sys.path.append(self.mirrors_dir)
         self.binaries_dir = os.path.join(self.working_dir, "binaries", "built")
         
