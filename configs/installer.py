@@ -148,6 +148,7 @@ class Installer:
         # Adding multilib support to pacman.conf
         self.run_command(["cp", os.path.join(self.working_dir, "pacman.py"), os.path.join("/mnt", "home", self.user, "pacman.py")])
         self.run_command(["arch-chroot", "/mnt", "python3", f"/home/{self.user}/pacman.py"])
+        self.run_command(["arch-chroot", "/mnt", "pacman", "-Syu", "--noconfirm"])
         self.run_command(["arch-chroot", "/mnt", "rm", f"/home/{self.user}/pacman.py"])
         
         # Setting up bootloader (GRUB)
