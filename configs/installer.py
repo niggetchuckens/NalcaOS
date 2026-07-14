@@ -11,6 +11,7 @@ class Installer:
         # self.configs_dir = os.path.join(self.working_dir, "configs"); sys.path.append(self.configs_dir)
         self.mirrors_dir = os.path.join(self.working_dir, "mirrors"); sys.path.append(self.mirrors_dir)
         self.binaries_dir = os.path.join(self.working_dir, "binaries", "built")
+        print(f"Working directory: {self.working_dir}") 
         
     def run_command(self, command, shell=False):
         try:
@@ -146,7 +147,7 @@ class Installer:
 
         
         # Adding multilib support to pacman.conf
-        self.run_command(["cp", os.path.join(self.configs_dir, "pacman.py"), os.path.join("/mnt", "home", self.user, "pacman.py")])
+        self.run_command(["cp", os.path.join(self.working_dir, "pacman.py"), os.path.join("/mnt", "home", self.user, "pacman.py")])
         self.run_command(["arch-chroot", "/mnt", "python3", f"/home/{self.user}/pacman.py"])
         self.run_command(["arch-chroot", "/mnt", "rm", f"/home/{self.user}/pacman.py"])
         
