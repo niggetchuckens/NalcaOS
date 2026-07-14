@@ -131,14 +131,14 @@ class Installer:
         # Install BlackArch repo
         try:
             import mirrors.blackarch.strap as blackarch
-            blackarch.nalca_install(self.user)
+            blackarch.nalca_install(user = self.user)
         except ImportError as e:
             print(f"\033[1;31m[!] ERROR: Failed to import BlackArch setup: {e}\033[0m", file=sys.stderr)
             
         # Install CachyOS repo and LTS kernel
         try:
             import mirrors.cachyos.mirrors as cachyos
-            cachyos.nalca_install(self.user)
+            cachyos.nalca_install(user = self.user)
             self.run_command(["arch-chroot", "/mnt", "pacman", "-S", "--noconfirm", "linux-cachyos-lts", "linux-cachyos-lts-headers"])
             
         except ImportError as e:
