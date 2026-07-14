@@ -128,6 +128,8 @@ class Installer:
         self.run_command("echo '%wheel ALL=(ALL) NOPASSWD: ALL' > /mnt/etc/sudoers.d/99-installer-nopasswd", shell=True)
         self.run_command(["arch-chroot", "/mnt", "chmod", "440", "/etc/sudoers.d/99-installer-nopasswd"])
         
+        # this section goes as try-except to avoid breaking the installer if the process fails, allowing the user to continue with the installation.
+        
         # Install BlackArch repo
         try:
             import mirrors.blackarch.strap as blackarch
@@ -146,37 +148,61 @@ class Installer:
 
         
         # Adding multilib support to pacman.conf
-        self.run_command(["cp", os.path.join(self.working_dir, "pacman.py"), os.path.join("/mnt", "home", self.user, "pacman.py")])
-        self.run_command(["arch-chroot", "/mnt", "python3", f"/home/{self.user}/pacman.py"])
-        self.run_command(["arch-chroot", "/mnt", "pacman", "-Syu", "--noconfirm"])
-        self.run_command(["arch-chroot", "/mnt", "rm", f"/home/{self.user}/pacman.py"])
+        try:   
+            self.run_command(["cp", os.path.join(self.working_dir, "pacman.py"), os.path.join("/mnt", "home", self.user, "pacman.py")])
+            
+        except Exception as e:
+            print(f"\033[1;31m[!] ERROR: Failed to copy pacman.py: {e}\033[0m", file=sys.stderr)
+
+        try:
+            self.run_command(["arch-chroot", "/mnt", "python3", f"/home/{self.user}/pacman.py"])
+            self.run_command(["arch-chroot", "/mnt", "pacman", "-Syu", "--noconfirm"])
+            self.run_command(["arch-chroot", "/mnt", "rm", f"/home/{self.user}/pacman.py"])
+        except Exception as e:
+            print(f"\033[1;31m[!] ERROR: Failed to run pacman.py: {e}\033[0m", file=sys.stderr)
+        
+        except Exception as e:
+            print(f"\033[1;31m[!] ERROR: Failed to copy pacman.py: {e}\033[0m", file=sys.stderr)
+        
         
         # Setting up bootloader (GRUB)
-        self.run_command(["arch-chroot", "/mnt", "pacman", "-S", "--noconfirm", "grub", "efibootmgr"])
-        self.run_command(["arch-chroot", "/mnt", "grub-install", "--target=x86_64-efi", "--efi-directory=/boot", "--bootloader-id=GRUB"])
-        self.run_command(["arch-chroot", "/mnt", "grub-mkconfig", "-o", "/boot/grub/grub.cfg"])
+        try:
+            self.run_command(["arch-chroot", "/mnt", "pacman", "-S", "--noconfirm", "grub", "efibootmgr"])
+            self.run_command(["arch-chroot", "/mnt", "grub-install", "--target=x86_64-efi", "--efi-directory=/boot", "--bootloader-id=GRUB"])
+            self.run_command(["arch-chroot", "/mnt", "grub-mkconfig", "-o", "/boot/grub/grub.cfg"])
+        except Exception as e:
+            print(f"\033[1;31m[!] ERROR: Failed to install GRUB: {e}\033[0m", file=sys.stderr)
         
         # Install yay
-        yay_path = os.path.abspath(os.path.join(self.binaries_dir, "yay.pkg.tar.zst"))
-        dest_path = os.path.join("/mnt", "home", self.user, "yay.pkg.tar.zst")
-        os.makedirs(os.path.join("/mnt", "home", self.user), exist_ok=True)
-        
-        self.run_command(["cp", yay_path, dest_path])
-        self.run_command(["arch-chroot", "/mnt", "pacman", "-U", "--noconfirm", dest_path.replace("/mnt", "")])
-        self.run_command(["arch-chroot", "/mnt", "rm", dest_path.replace("/mnt", "")])
-        
+        try:
+            yay_path = os.path.abspath(os.path.join(self.binaries_dir, "yay.pkg.tar.zst"))
+            dest_path = os.path.join("/mnt", "home", self.user, "yay.pkg.tar.zst")
+            os.makedirs(os.path.join("/mnt", "home", self.user), exist_ok=True)
+            
+            self.run_command(["cp", yay_path, dest_path])
+            self.run_command(["arch-chroot", "/mnt", "pacman", "-U", "--noconfirm", dest_path.replace("/mnt", "")])
+            self.run_command(["arch-chroot", "/mnt", "rm", dest_path.replace("/mnt", "")])
+        except Exception as e:
+            print(f"\033[1;31m[!] ERROR: Failed to install yay: {e}\033[0m", file=sys.stderr)
+
         # Install PortProton
-        portproton_path = os.path.abspath(os.path.join(self.binaries_dir, "portproton.pkg.tar.zst"))
-        dest_path = os.path.join("/mnt", "home", self.user, "portproton.pkg.tar.zst")
-        os.makedirs(os.path.join("/mnt", "home", self.user), exist_ok=True)
-        
-        self.run_command(["cp", portproton_path, dest_path])
-        self.run_command(["arch-chroot", "/mnt", "pacman", "-U", "--noconfirm", dest_path.replace("/mnt", "")])
-        self.run_command(["arch-chroot", "/mnt", "rm", dest_path.replace("/mnt", "")])
-        
+        try:
+            portproton_path = os.path.abspath(os.path.join(self.binaries_dir, "portproton.pkg.tar.zst"))
+            dest_path = os.path.join("/mnt", "home", self.user, "portproton.pkg.tar.zst")
+            os.makedirs(os.path.join("/mnt", "home", self.user), exist_ok=True)
+            
+            self.run_command(["cp", portproton_path, dest_path])
+            self.run_command(["arch-chroot", "/mnt", "pacman", "-U", "--noconfirm", dest_path.replace("/mnt", "")])
+            self.run_command(["arch-chroot", "/mnt", "rm", dest_path.replace("/mnt", "")])
+        except Exception as e:
+            print(f"\033[1;31m[!] ERROR: Failed to install PortProton: {e}\033[0m", file=sys.stderr)
+
         # Remove NOPASSWD from sudoers
-        self.run_command(["arch-chroot", "/mnt", "rm", "/etc/sudoers.d/99-installer-nopasswd"])
-        
+        try:
+            self.run_command(["arch-chroot", "/mnt", "rm", "/etc/sudoers.d/99-installer-nopasswd"])
+        except Exception as e:
+            print(f"\033[1;31m[!] ERROR: Failed to remove NOPASSWD from sudoers: {e}\033[0m", file=sys.stderr)
+
         # Enable services
         self.run_command(["arch-chroot", "/mnt", "systemctl", "enable", "NetworkManager"])
         self.run_command(["arch-chroot", "/mnt", "systemctl", "enable", "sshd"])
@@ -257,11 +283,14 @@ class Installer:
             
             return " ".join(selected_de[1]), selected_de[2]
 
-        desktop_packages, display_manager = de_select()
-        self.run_command(["arch-chroot", "/mnt", "pacman", "-S", "--noconfirm"] + desktop_packages.split())
-        if display_manager:
-            self.run_command(["arch-chroot", "/mnt", "systemctl", "enable", display_manager])
-        
+        try:
+            desktop_packages, display_manager = de_select()
+            self.run_command(["arch-chroot", "/mnt", "pacman", "-S", "--noconfirm"] + desktop_packages.split())
+            if display_manager:
+                self.run_command(["arch-chroot", "/mnt", "systemctl", "enable", display_manager])
+        except Exception as e:
+            print(f"\033[1;31m[!] ERROR: Failed to install desktop environment: {e}\033[0m", file=sys.stderr)
+
     def run(self):
         self.configure_pacman()
         self.disks()
