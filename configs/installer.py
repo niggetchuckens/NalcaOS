@@ -264,8 +264,8 @@ class Installer:
     def run(self):
         self.configure_pacman()
         self.disks()
-        self.mirrors_setup()
         self.install_base()
         self.arch_chroot()
+        self.mirrors_setup()
         self.install_desktop()
         print("Installation complete! Reboot your system and remove the installation media.")
