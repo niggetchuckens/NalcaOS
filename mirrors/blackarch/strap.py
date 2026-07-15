@@ -177,6 +177,8 @@ def blackarch_setup():
                 delete_signature()
                 check_pacman_gnupg()
                 install_keyring()
+                pacman_update()
+                pacman_upgrade()
             finally:
                 os.chdir(old_cwd)
                 

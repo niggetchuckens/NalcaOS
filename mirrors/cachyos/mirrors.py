@@ -69,7 +69,13 @@ def install_cachyos_packages():
     subprocess.run(['pacman', '-Sy'], check=False)
     
     with tempfile.TemporaryDirectory() as pkg_cache_dir:
-        packages = ['cachyos-keyring', 'cachyos-mirrorlist', 'cachyos-v3-mirrorlist', 'cachyos-v4-mirrorlist']
+        isa = get_cpu_isa()
+        packages = ['cachyos-keyring', 'cachyos-mirrorlist']
+        if isa == 'v3':
+            packages.append('cachyos-v3-mirrorlist')
+        elif isa == 'v4':
+            packages.extend(['cachyos-v3-mirrorlist', 'cachyos-v4-mirrorlist'])
+        
         subprocess.run(['pacman', '-Sw', '--noconfirm', '--cachedir', pkg_cache_dir] + packages, check=False)
         
         downloaded_pkgs = glob.glob(os.path.join(pkg_cache_dir, "*.pkg.tar.zst"))
@@ -141,8 +147,17 @@ def append_cachyos_repos():
         msg_print("CachyOS repos already seem present in pacman.conf, skipping append.")
         return
 
-    with open(conf_path, 'a') as f:
-        f.write("\n" + "\n".join(repos) + "\n")
+    # Tell pacman that the new architecture is valid
+    if isa == 'v4':
+        content = content.replace("Architecture = auto", "Architecture = auto x86_64_v4 x86_64_v3")
+    elif isa == 'v3':
+        content = content.replace("Architecture = auto", "Architecture = auto x86_64_v3")
+
+    with open(conf_path, 'w') as f:
+        f.write(content)
+        if not content.endswith('\n'):
+            f.write('\n')
+        f.write('\n' + '\n'.join(repos) + '\n')
 
     msg_print("CachyOS repos appended successfully.")
 
