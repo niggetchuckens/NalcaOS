@@ -23,3 +23,7 @@ def configure_pacman():
             f.write(content)
     except Exception as e:
         print(f"Warning: Could not configure pacman.conf: {e}")
+
+
+if __name__ == "__main__":
+    configure_pacman()
