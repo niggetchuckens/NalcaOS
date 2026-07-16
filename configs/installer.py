@@ -1,4 +1,5 @@
 import os
+import re
 import sys    
 import subprocess
 
@@ -29,12 +30,17 @@ class Installer:
             if 'ILoveCandy' not in content:
                 content = content.replace('Color\n', 'Color\nILoveCandy\n')
     
-            if '#[multilib]' in content:
-                content = content.replace('#[multilib]\n#Include = /etc/pacman.d/mirrorlist', '[multilib]\nInclude = /etc/pacman.d/mirrorlist')
-                            
+            content = re.sub(
+                r'#\s*\[multilib\]\n#\s*Include\s*=\s*/etc/pacman\.d/mirrorlist',
+                '[multilib]\nInclude = /etc/pacman.d/mirrorlist',
+                content
+            )
+
             with open('/etc/pacman.conf', 'w') as f:
                 f.write(content)
-                
+
+            subprocess.run(["pacman", "-Sy", "--noconfirm"], check=False)
+
         except Exception as e:
             print(f"Warning: Could not configure pacman.conf: {e}")
             
@@ -160,9 +166,6 @@ class Installer:
             self.run_command(["arch-chroot", "/mnt", "rm", f"/home/{self.user}/pacman.py"])
         except Exception as e:
             print(f"\033[1;31m[!] ERROR: Failed to run pacman.py: {e}\033[0m", file=sys.stderr)
-        
-        except Exception as e:
-            print(f"\033[1;31m[!] ERROR: Failed to copy pacman.py: {e}\033[0m", file=sys.stderr)
         
         
         # Setting up bootloader (GRUB)

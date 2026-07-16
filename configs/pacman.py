@@ -1,3 +1,6 @@
+import re
+
+
 def configure_pacman():
     print("Configuring Pacman (Enabling Colors, Parallel Downloads, ILoveCandy and Multilib)...")
     try:
@@ -10,8 +13,11 @@ def configure_pacman():
         if 'ILoveCandy' not in content:
             content = content.replace('Color\n', 'Color\nILoveCandy\n')
             
-        if '#[multilib]' in content:
-            content = content.replace('#[multilib]\n#Include = /etc/pacman.d/mirrorlist', '[multilib]\nInclude = /etc/pacman.d/mirrorlist')
+        content = re.sub(
+            r'#\s*\[multilib\]\n#\s*Include\s*=\s*/etc/pacman\.d/mirrorlist',
+            '[multilib]\nInclude = /etc/pacman.d/mirrorlist',
+            content
+        )
             
         with open('/etc/pacman.conf', 'w') as f:
             f.write(content)
