@@ -1,10 +1,1 @@
-# Folders
 binaries/to-build
-
-# File extensions
-*txt
-*.pyc
-
-# Files
-install.sh
-binaries/built/download_mirror.py
