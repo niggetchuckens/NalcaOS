@@ -1,1 +1,11 @@
+# Folders
 binaries/to-build
+
+# File extensions
+*txt
+*.pycbinaries/built/download_mirror.py
+
+# Files
+install.sh
+binaries/built/cachy-mirrors.txt
+binaries/built/download_mirror.py
