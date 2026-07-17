@@ -9,7 +9,7 @@ class Installer:
         self.password = password or input("Enter your password: ").strip()
         self.working_dir = os.path.dirname(os.path.abspath(__file__))
         self.mirrors_dir = os.path.join(self.working_dir, "mirrors"); sys.path.append(self.mirrors_dir)
-        self.binaries_dir = os.path.join(self.working_dir, "..", "binaries", "built")
+        self.binaries_dir = os.path.join(self.working_dir, "..", "binaries", "built", "apps")
         print(f"Working directory: {self.working_dir}") 
         
     def run_command(self, command, shell=False):
@@ -166,12 +166,12 @@ class Installer:
         
         
         # Setting up bootloader (GRUB)
-        # try:
-        #     self.run_command(["arch-chroot", "/mnt", "pacman", "-S", "--noconfirm", "grub", "efibootmgr"])
-        #     self.run_command(["arch-chroot", "/mnt", "grub-install", "--target=x86_64-efi", "--efi-directory=/boot", "--bootloader-id=GRUB"])
-        #     self.run_command(["arch-chroot", "/mnt", "grub-mkconfig", "-o", "/boot/grub/grub.cfg"])
-        # except Exception as e:
-        #     print(f"\033[1;31m[!] ERROR: Failed to install GRUB: {e}\033[0m", file=sys.stderr)
+        try:
+            self.run_command(["arch-chroot", "/mnt", "pacman", "-S", "--noconfirm", "grub", "efibootmgr"])
+            self.run_command(["arch-chroot", "/mnt", "grub-install", "--target=x86_64-efi", "--efi-directory=/boot", "--bootloader-id=GRUB"])
+            self.run_command(["arch-chroot", "/mnt", "grub-mkconfig", "-o", "/boot/grub/grub.cfg"])
+        except Exception as e:
+            print(f"\033[1;31m[!] ERROR: Failed to install GRUB: {e}\033[0m", file=sys.stderr)
         
         # Install yay
         try:
