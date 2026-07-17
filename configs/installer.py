@@ -207,6 +207,37 @@ class Installer:
         self.run_command(["arch-chroot", "/mnt", "systemctl", "enable", "NetworkManager"])
         self.run_command(["arch-chroot", "/mnt", "systemctl", "enable", "sshd"])
 
+    def setup_secureboot(self):
+        print("Setting up Secure Boot...")
+        try:
+            self.run_command(["arch-chroot", "/mnt", "pacman", "-S", "--noconfirm", "sbctl"])
+            self.run_command(["arch-chroot", "/mnt", "sbctl", "create-keys"])
+            
+            try:
+                self.run_command(["arch-chroot", "/mnt", "sbctl", "enroll-keys", "-m"])
+            except Exception as e:
+                print(f"Warning: Could not enroll keys (system might not be in Setup Mode): {e}")
+                
+            # Sign the bootloader
+            try:
+                self.run_command(["arch-chroot", "/mnt", "sbctl", "sign", "-s", "/boot/EFI/GRUB/grubx64.efi"])
+            except Exception as e:
+                print(f"Warning: Could not sign GRUB: {e}")
+                
+            # Sign the kernel
+            try:
+                run_command(["arch-chroot", "/mnt", "bash", "-c", "for kernel in /boot/vmlinuz-*; do sbctl sign -s \"$kernel\"; done"])
+            except Exception as e:
+                print(f"Warning: Could not sign kernel(s): {e}")
+                
+            # Verify status
+            run_command(["arch-chroot", "/mnt", "sbctl", "status"])
+            print("Secure Boot setup completed.")
+            
+        except Exception as e:
+            print(f"\033[1;31m[!] ERROR: Failed to setup secure boot: {e}\033[0m", file=sys.stderr)
+
+
     def install_desktop(self):
         kde_plasma = ["plasma", "sddm", "konsole", "dolphin"]
         gnome = ["gnome", "gdm"]
