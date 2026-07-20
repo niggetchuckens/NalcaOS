@@ -27,3 +27,6 @@ def configure_pacman():
 
 if __name__ == "__main__":
     configure_pacman()
+
+if __name__ == "__main__":
+    configure_pacman()
