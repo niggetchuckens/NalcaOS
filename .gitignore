@@ -1,10 +1,12 @@
 # Folders
 binaries/to-build
+nalcaos/
 
 # File extensions
 *txt
-*.pyc
+*.pycbinaries/built/download_mirror.py
 
 # Files
 install.sh
+binaries/built/cachy-mirrors.txt
 binaries/built/download_mirror.py
