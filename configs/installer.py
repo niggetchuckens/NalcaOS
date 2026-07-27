@@ -200,6 +200,16 @@ class Installer:
         except Exception as e:
             print(f"\033[1;31m[!] ERROR: Failed to install PortProton: {e}\033[0m", file=sys.stderr)
 
+        # Install simplexampp
+        try:
+            pkg_path = os.path.abspath(os.path.join(self.binaries_dir, "simplexampp.pkg.tar.zst"))
+            dest_path = os.path.join("/mnt", "home", self.user, "simplexampp.pkg.tar.zst")
+            self.run_command(["cp", pkg_path, dest_path])
+            self.run_command(["arch-chroot", "/mnt", "pacman", "-U", "--noconfirm", dest_path.replace("/mnt", "")])
+            self.run_command(["arch-chroot", "/mnt", "rm", dest_path.replace("/mnt", "")])
+        except Exception as e:
+            print(f"\033[1;31m[!] ERROR: Failed to install simplexampp: {e}\033[0m", file=sys.stderr)
+
         # Remove NOPASSWD from sudoers
         try:
             self.run_command(["arch-chroot", "/mnt", "rm", "/etc/sudoers.d/99-installer-nopasswd"])
