@@ -1,64 +1,76 @@
 # NalcaOS
 
-NalcaOS is a custom operating system installation project. It includes scripts to automate the installation and configuration of a fully functional Linux environment with selected tools, desktop environments, and optimizations out of the box.
+NalcaOS is a custom operating system installation project for Arch Linux. It includes scripts to automate disk partitioning, base system installation, and configuration of a fully functional Linux environment with optimized third-party repositories, multiple desktop environments/window managers, secure boot support, and essential applications out of the box.
+
+## Installation & Usage
+
+You can install NalcaOS directly from an Arch Linux live ISO without needing to manually clone the repository beforehand. Ensure you are connected to the internet, then execute one of the following commands:
+
+### Option 1: Quick Install (One-Liner)
+
+Run the automated installation script directly using `curl`:
+
+```bash
+curl -sSL https://minio-api.hime-code.xyz/nalcaos/install.sh | bash
+```
+
+### Option 2: Manual Download & Execute
+
+If you prefer to download the installer script and execute it manually:
+
+```bash
+curl -sSL https://minio-api.hime-code.xyz/nalcaos/install.sh -o install.sh
+chmod +x install.sh
+./install.sh
+```
+
+### Option 3: Manual Git Clone & Run
+
+If you have cloned the repository manually within an Arch Linux live media:
+
+```bash
+python3 main.py
+```
+
+The interactive installer will prompt you for your desired username, password, target disk to partition and format, CPU/GPU hardware brands, and your preferred Desktop Environment or Window Manager. Upon completion, the script automatically unmounts the filesystems and reboots your system.
 
 ## Project Structure
 
-- `installer.py`: The main installation script (written in Python) designed for Arch Linux. It automates disk partitioning, base system installation, user creation, and desktop environment setup.
-- `install.sh`: A post-installation shell script for setting up additional software, Flatpaks, and custom applications (such as Proteus, XAMPP, and Cisco tools). *Note: This script currently uses `apt` and appears to be targeted at Debian-based systems.*
-- `mirrors/`: Contains Python modules to set up third-party repositories like BlackArch and CachyOS.
-- `binaries/`: Stores pre-compiled binaries (e.g., `yay.pkg.tar.zst`) for quick installation without compiling from the AUR during setup.
+- `install.sh`: The automated bootstrap shell script. It downloads the required installation packages directly from the custom MinIO server or seamlessly falls back to cloning the GitHub repository if the server is unreachable, executes `main.py`, and cleans up after installation.
+- `main.py`: The entrypoint script for the Python installer. It prompts for initial user credentials and launches the automated installation routine.
+- `configs/installer.py`: The core installation module containing the OOP `Installer` class. It manages disk partitioning, base system package installation, chroot configuration, third-party mirrors, secure boot signing, and desktop environment deployment.
+- `configs/pacman.py`: Helper script executed inside the chroot environment to finalize package updates and configurations.
+- `mirrors/`: Contains Python modules to set up third-party repositories such as **BlackArch** and **CachyOS**.
+- `binaries/`: Stores pre-compiled binaries (such as `yay` and `PortProton`) for immediate out-of-the-box installation without requiring manual compilation from the AUR during setup.
 
 ## Technical Details
 
-### Arch Linux Installer (`installer.py`)
+### Automated Bootstrapper (`install.sh`)
+The bootstrap script makes deploying NalcaOS fast and resilient:
+- **Server Fetch with GitHub Fallback**: Attempts to directly fetch the latest installation assets from the custom MinIO API server (`http://minio-api.hime-code.xyz/nalcaos`). If the homelab/server is unreachable, it automatically falls back to installing `git` via `pacman` and cloning the repository from GitHub.
+- **Cleanup & Reboot**: On successful execution of `main.py`, it removes temporary staging folders, cleanly unmounts `/mnt`, and reboots into your fresh installation.
 
-The Python installer automates an Arch Linux installation using a series of defined functions to step through the standard Arch installation guide programmatically:
+### Core Arch Linux Installer (`configs/installer.py`)
+The automated installer executes the standard Arch Linux installation steps programmatically:
 
-- `run_command()`: A robust helper function to execute shell commands programmatically and halt the installation if critical errors occur.
-- `configure_pacman()`: Enhances the package manager by editing `/etc/pacman.conf` to enable `Color`, `ParallelDownloads`, and the hidden `ILoveCandy` easter egg for a better visual experience during installation.
-- `set_disks()`: Asks the user for a target drive (e.g., `sda`, `nvme0n1`). It then completely wipes the drive, creates a 1GB EFI (`fat32`) partition for boot and an `ext4` partition for the rest of the root filesystem using `parted`, and automatically mounts them to `/mnt`.
-- `install_base()`: Prompts the user to specify their hardware (Intel/AMD CPU and Intel/AMD/NVIDIA GPU). It then dynamically runs `pacstrap` to install the `base`, `linux-firmware`, `base-devel`, network tools, OpenSSH, and the correct microcode/graphics drivers for the chosen hardware. It also generates the `fstab` file.
-- `de_select()`: Provides an interactive menu for the user to choose their preferred Desktop Environment or Window Manager. Options include: KDE Plasma, GNOME, XFCE, Hyprland, Sway, or a headless (TTY-only) setup. It maps the selection to the corresponding Arch packages and display manager service (e.g., `sddm`, `gdm`, `lightdm`).
-- `base_config()`: The final overarching setup function that handles the `arch-chroot` stage. It manages:
-  - Setting the timezone to `America/Santiago` and synchronizing the hardware clock.
-  - Setting the system locales to `en_US.UTF-8` and setting the hostname to `NalcaOS`.
-  - Creating a root password and setting up a new standard user with `wheel` (sudo) privileges.
-  - **Third-party Repositories**: Invoking the Python modules from the `mirrors/` folder to install the **BlackArch** penetration testing repository and the **CachyOS** repository. It then installs the optimized `linux-cachyos-lts` kernel.
-  - **Bootloader**: Installing `grub` and `efibootmgr`, then configuring GRUB for UEFI.
-  - **AUR Helper**: Copying over and installing a pre-compiled `yay` package from the local `binaries/` directory so it is available out of the box.
-  - **DE Installation**: Finally, it installs the packages selected in `de_select()`, enables the display manager, NetworkManager, and sshd services, unmounts the drives, and reboots.
+- `configure_pacman()`: Modifies `/etc/pacman.conf` to enable `Color`, `ParallelDownloads`, `Multilib` support, and the hidden `ILoveCandy` easter egg for an improved visual package management experience.
+- `disks()`: Displays available storage devices to the user via `lsblk`. Once chosen, it wipes the drive, creates a 1GB EFI (`fat32`) boot partition and an `ext4` root filesystem using `parted`, and mounts them under `/mnt` and `/mnt/boot`.
+- `install_base()`: Prompts for CPU (Intel/AMD) and GPU (Intel/AMD/NVIDIA) manufacturers to install appropriate microcode and graphics drivers alongside `base`, `linux-firmware`, `base-devel`, network tools, and OpenSSH via `pacstrap`. Automatically generates `/mnt/etc/fstab`.
+- `arch_chroot()`: Configures the newly installed system inside `arch-chroot`:
+  - Sets timezone to `America/Santiago`, syncs the hardware clock, and generates system locales (`en_US.UTF-8`).
+  - Sets hostname to `NalcaOS` and sets root and standard user passwords with `wheel` (sudo) privileges.
+  - **Third-Party Repositories**: Integrates modules from `mirrors/` to configure the **BlackArch** penetration testing repository and the **CachyOS** performance repository, installing the `linux-cachyos-lts` kernel.
+  - **Pre-compiled Software**: Automatically copies over and installs pre-built binaries from `binaries/`, providing the `yay` AUR helper and `PortProton` out of the box.
+  - Configures GRUB for UEFI booting and enables necessary system services (`NetworkManager`, `sshd`).
+- `setup_secureboot()`: Automates UEFI Secure Boot signing using `sbctl`. Generates Secure Boot keys, attempts to enroll them into UEFI Setup Mode, and digitally signs GRUB and kernel images (`vmlinuz-*`).
+- `install_desktop()`: Provides an interactive menu featuring **18 Desktop Environment and Window Manager options**:
+  - **Desktop Environments**: KDE Plasma, GNOME, XFCE, Cinnamon, MATE, LXQt, LXDE, Budgie, Deepin, Pantheon, Enlightenment, Trinity, Cosmic.
+  - **Window Managers (Wayland & X11)**: Hyprland, Sway, River, Wayfire, Labwc, Niri, Cage, Hikari, i3-wm, bspwm, Awesome, xmonad, qtile, dwm, Openbox, IceWM, Fluxbox, Herbstluftwm, Spectrwm, JWM, dk, StumpWM, or a headless (TTY-only) setup.
+  - Dynamically configures and enables the corresponding display manager service (e.g., `sddm`, `gdm`, `lightdm`).
 
-### Debian-Based Post-Installation (`install.sh`)
+## Planned Features & Roadmap
 
-This script serves to bootstrap a machine with additional user-space tools, leveraging Flatpaks and direct downloads from a custom Minio server.
-
-- `user_to_sudoers()`: Dynamically grants password-less `sudo` rights to the active user by adding them to `/etc/sudoers.d/`.
-- `install_pkgs()`: Uses `apt` to install development basics (btop, git, openssh). It then initializes `flathub` and installs GUI applications through Flatpak (PortProton, VS Code, OnlyOffice).
-- `install_proteus()`: Downloads a custom `proteus.tar.gz` archive from the project's server, extracts it, and creates a Linux `.desktop` entry that launches the Windows application via PortProton seamlessly.
-- `install_xampp()`: Automatically downloads and performs an unattended, silent installation of XAMPP via a `.run` binary.
-- `install_cisco()`: Downloads and installs the Cisco Packet Tracer via a `.deb` package using `apt`.
-
-## Usage
-
-### Running the Arch Linux Installer
-To install NalcaOS using the Python installer, boot into an Arch Linux live ISO, ensure you are connected to the internet, and execute:
-
-```bash
-python installer.py
-```
-The script will prompt you for the disk to format, your CPU/GPU manufacturers, your preferred Desktop Environment, and credentials for the new user.
-
-### Post-Installation Apps (Debian-based)
-If you are on a Debian-based system (or adapting the script for Arch), you can run the post-installation script to install additional tools and Flatpaks:
-
-```bash
-sudo ./install.sh
-```
-
-## Planned Features
-
-Check the [`todo.md`](todo.md) file for upcoming features and planned improvements, such as:
-- Automatic local XAMPP configuration script.
-- Pre-compiling PortProton for system-wide installation.
-- Installation of virtualization tools, programming languages, and IDEs.
+Check out the additional documentation files in the repository for upcoming initiatives and deployment workflows:
+- [`todo.md`](todo.md): Upcoming features and planned system optimizations.
+- [`mirror-deploy-roadmap.md`](mirror-deploy-roadmap.md): Roadmap and technical guide for custom mirror server deployments.
+- [`nalcaos-calamares-guide.md`](nalcaos-calamares-guide.md): Reference guide for integrating NalcaOS with the Calamares graphical installer framework.
