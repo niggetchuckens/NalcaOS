@@ -70,6 +70,12 @@ class Installer:
         env_name = "Virtual Machine" if self.is_vm else "Physical Machine"
         print(f"Environment set to: {env_name} ({self.vm_type})")
 
+        self.is_uefi = os.path.isdir("/sys/firmware/efi")
+        if self.is_uefi:
+            print("Boot mode: UEFI detected")
+        else:
+            print("Boot mode: BIOS/Legacy detected")
+
     def cleanup_mounts(self):
         mounts = ["/mnt/boot", "/mnt"]
         for mount in mounts:
@@ -141,17 +147,27 @@ class Installer:
             part1 = self.disk + "1"
             part2 = self.disk + "2"
             
-        # Formatting the disks
+        # Create GPT partition table
         self.run_command(["parted", "-s", self.disk, "mklabel", "gpt"])
-        self.run_command(["parted", "-s", self.disk, "mkpart", "EFI", "fat32", "1MiB", "1G"])
-        self.run_command(["parted", "-s", self.disk, "set", "1", "esp", "on"])
-        self.run_command(["parted", "-s", self.disk, "mkpart", "primary", "ext4", "1G", "100%"])
-        self.run_command(["mkfs.fat", "-F32", part1])
+        
+        if self.is_uefi:
+            # UEFI: EFI System Partition (FAT32, 1GB)
+            self.run_command(["parted", "-s", self.disk, "mkpart", "EFI", "fat32", "1MiB", "1G"])
+            self.run_command(["parted", "-s", self.disk, "set", "1", "esp", "on"])
+            self.run_command(["parted", "-s", self.disk, "mkpart", "primary", "ext4", "1G", "100%"])
+            self.run_command(["mkfs.fat", "-F32", part1])
+        else:
+            # BIOS: BIOS Boot Partition (1MB) for GRUB on GPT
+            self.run_command(["parted", "-s", self.disk, "mkpart", "primary", "1MiB", "3MiB"])
+            self.run_command(["parted", "-s", self.disk, "set", "1", "bios_grub", "on"])
+            self.run_command(["parted", "-s", self.disk, "mkpart", "primary", "ext4", "3MiB", "100%"])
+        
         self.run_command(["mkfs.ext4", "-F", part2])
         
         self.run_command(["mount", part2, "/mnt"])
-        self.run_command(["mkdir", "-p", "/mnt/boot"])
-        self.run_command(["mount", part1, "/mnt/boot"])
+        if self.is_uefi:
+            self.run_command(["mkdir", "-p", "/mnt/boot"])
+            self.run_command(["mount", part1, "/mnt/boot"])
         
     def mirrors_setup(self):
         try:
@@ -268,16 +284,12 @@ class Installer:
         
         # Setting up bootloader (GRUB)
         try:
-            self.run_command(["arch-chroot", "/mnt", "pacman", "-S", "--noconfirm", "grub", "efibootmgr"])
-            if self.is_vm:
-                # For VMs, try UEFI first, fallback to BIOS if it fails
-                try:
-                    self.run_command(["arch-chroot", "/mnt", "grub-install", "--target=x86_64-efi", "--efi-directory=/boot", "--bootloader-id=GRUB"])
-                except SystemExit:
-                    print("UEFI boot failed, trying BIOS/legacy mode...")
-                    self.run_command(["arch-chroot", "/mnt", "grub-install", "--target=i386-pc", self.disk])
-            else:
+            if self.is_uefi:
+                self.run_command(["arch-chroot", "/mnt", "pacman", "-S", "--noconfirm", "grub", "efibootmgr"])
                 self.run_command(["arch-chroot", "/mnt", "grub-install", "--target=x86_64-efi", "--efi-directory=/boot", "--bootloader-id=GRUB"])
+            else:
+                self.run_command(["arch-chroot", "/mnt", "pacman", "-S", "--noconfirm", "grub"])
+                self.run_command(["arch-chroot", "/mnt", "grub-install", "--target=i386-pc", self.disk])
             self.run_command(["arch-chroot", "/mnt", "grub-mkconfig", "-o", "/boot/grub/grub.cfg"])
         except Exception as e:
             print(f"\033[1;31m[!] ERROR: Failed to install GRUB: {e}\033[0m", file=sys.stderr)
