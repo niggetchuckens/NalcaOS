@@ -10,7 +10,7 @@ class Installer:
         self.password = password or input("Enter your password: ").strip()
         self.working_dir = os.path.dirname(os.path.abspath(__file__))
         self.mirrors_dir = os.path.join(self.working_dir, "mirrors"); sys.path.append(self.mirrors_dir)
-        self.binaries_dir = os.path.join(self.working_dir, "..", "binaries", "built", "apps")
+        self.binaries_dir = os.path.realpath(os.path.join(self.working_dir, "..", "binaries", "built", "apps"))
         print(f"Working directory: {self.working_dir}") 
         
     def run_command(self, command, shell=False):
