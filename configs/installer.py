@@ -16,8 +16,70 @@ class Installer:
     def run_command(self, command, shell=False):
         try:
             subprocess.run(command, shell=shell, check=True)
-        except subprocess.CalledProcessError:
+        except subprocess.CalledProcessError as e:
+            print(f"\033[1;31m[!] Command failed: {command}\033[0m", file=sys.stderr)
+            print(f"\033[1;31m[!] Return code: {e.returncode}\033[0m", file=sys.stderr)
             sys.exit(1)
+
+    def detect_environment(self):
+        try:
+            with open("/sys/class/dmi/id/product_name", "r") as f:
+                product = f.read().strip().lower()
+            if "kvm" in product or "qemu" in product:
+                return "qemu"
+            elif "virtualbox" in product:
+                return "virtualbox"
+            elif "vmware" in product:
+                return "vmware"
+            else:
+                return "physical"
+        except FileNotFoundError:
+            return "unknown"
+
+    def select_environment(self):
+        detected = self.detect_environment()
+        vm_options = {
+            "1": ("Physical machine", False, "physical"),
+            "2": ("Virtual machine (QEMU/KVM)", True, "qemu"),
+            "3": ("Virtual machine (VirtualBox)", True, "virtualbox"),
+            "4": ("Virtual machine (VMware)", True, "vmware"),
+            "5": ("Virtual machine (Other)", True, "other")
+        }
+
+        detected_key = None
+        for key, value in vm_options.items():
+            if value[2] == detected:
+                detected_key = key
+                break
+
+        print("\nSelect your environment:")
+        for key, value in vm_options.items():
+            marker = " (detected)" if key == detected_key else ""
+            print(f"{key}) {value[0]}{marker}")
+
+        choice = ""
+        while choice not in vm_options:
+            default = f" [{detected_key}]" if detected_key else ""
+            choice = input(f"Selection (1-5){default}: ").strip()
+            if not choice and detected_key:
+                choice = detected_key
+
+        selected = vm_options[choice]
+        self.is_vm = selected[1]
+        self.vm_type = selected[2]
+        env_name = "Virtual Machine" if self.is_vm else "Physical Machine"
+        print(f"Environment set to: {env_name} ({self.vm_type})")
+
+    def cleanup_mounts(self):
+        mounts = ["/mnt/boot", "/mnt"]
+        for mount in mounts:
+            try:
+                result = subprocess.run(["mountpoint", "-q", mount], capture_output=True)
+                if result.returncode == 0:
+                    print(f"Unmounting {mount}...")
+                    subprocess.run(["umount", "-R", mount], check=False)
+            except Exception:
+                pass
             
     def configure_pacman(self):
         print("Configuring Pacman (Enabling Colors, Parallel Downloads, ILoveCandy and Multilib)...")
@@ -45,25 +107,26 @@ class Installer:
             print(f"Warning: Could not configure pacman.conf: {e}")
             
     def disks(self):
+        self.cleanup_mounts()
         print("Available disks:")
         self.run_command("lsblk -d -n -o NAME,SIZE,MODEL | grep -v 'loop'", shell=True)
-        disk_input = input("\nEnter the disk to begin with the installation process (e.g., sda, nvme0n1): ").strip()
+        disk_input = input("\nEnter the disk to begin with the installation process (e.g., sda, vda, nvme0n1): ").strip()
         if disk_input.startswith("/dev/"):
             disk_input = disk_input[5:]
-        disk = "/dev/" + disk_input
+        self.disk = "/dev/" + disk_input
         
-        if disk[-1].isdigit():
-            part1 = disk + "p1"
-            part2 = disk + "p2"
+        if self.disk[-1].isdigit():
+            part1 = self.disk + "p1"
+            part2 = self.disk + "p2"
         else:
-            part1 = disk + "1"
-            part2 = disk + "2"
+            part1 = self.disk + "1"
+            part2 = self.disk + "2"
             
         # Formatting the disks
-        self.run_command(["parted", "-s", disk, "mklabel", "gpt"])
-        self.run_command(["parted", "-s", disk, "mkpart", "EFI", "fat32", "1MiB", "1G"])
-        self.run_command(["parted", "-s", disk, "set", "1", "esp", "on"])
-        self.run_command(["parted", "-s", disk, "mkpart", "primary", "ext4", "1G", "100%"])
+        self.run_command(["parted", "-s", self.disk, "mklabel", "gpt"])
+        self.run_command(["parted", "-s", self.disk, "mkpart", "EFI", "fat32", "1MiB", "1G"])
+        self.run_command(["parted", "-s", self.disk, "set", "1", "esp", "on"])
+        self.run_command(["parted", "-s", self.disk, "mkpart", "primary", "ext4", "1G", "100%"])
         self.run_command(["mkfs.fat", "-F32", part1])
         self.run_command(["mkfs.ext4", "-F", part2])
         
@@ -95,8 +158,8 @@ class Installer:
             case "2":
                 cpu = "amd-ucode"
         
-        while gpu not in ["1", "2", "3"]:
-            gpu = input("Enter your GPU brand:\n1) Intel\n2) AMD\n3) NVIDIA\n").strip()
+        while gpu not in ["1", "2", "3", "4"]:
+            gpu = input("Enter your GPU brand:\n1) Intel\n2) AMD\n3) NVIDIA\n4) Virtual/Generic (for VMs)\n").strip()
         match gpu:
             case "1":
                 gpu = "mesa xf86-video-intel vulkan-intel"
@@ -104,8 +167,13 @@ class Installer:
                 gpu = "mesa xf86-video-amdgpu vulkan-radeon"
             case "3":
                 gpu = "nvidia-dkms nvidia-utils"
+            case "4":
+                gpu = "mesa"
         
-        pkgs = f"base linux-firmware base-devel git curl wget networkmanager sudo vim nano openssh python {cpu} {gpu} "
+        if self.is_vm:
+            pkgs = f"base base-devel git curl wget networkmanager sudo vim nano openssh python {cpu} {gpu} "
+        else:
+            pkgs = f"base linux-firmware base-devel git curl wget networkmanager sudo vim nano openssh python {cpu} {gpu} "
         
         print(f"Installing base packages: {pkgs}")
         self.run_command(["pacstrap", "-K", "/mnt"] + pkgs.strip().split())
@@ -171,7 +239,15 @@ class Installer:
         # Setting up bootloader (GRUB)
         try:
             self.run_command(["arch-chroot", "/mnt", "pacman", "-S", "--noconfirm", "grub", "efibootmgr"])
-            self.run_command(["arch-chroot", "/mnt", "grub-install", "--target=x86_64-efi", "--efi-directory=/boot", "--bootloader-id=GRUB"])
+            if self.is_vm:
+                # For VMs, try UEFI first, fallback to BIOS if it fails
+                try:
+                    self.run_command(["arch-chroot", "/mnt", "grub-install", "--target=x86_64-efi", "--efi-directory=/boot", "--bootloader-id=GRUB"])
+                except SystemExit:
+                    print("UEFI boot failed, trying BIOS/legacy mode...")
+                    self.run_command(["arch-chroot", "/mnt", "grub-install", "--target=i386-pc", self.disk])
+            else:
+                self.run_command(["arch-chroot", "/mnt", "grub-install", "--target=x86_64-efi", "--efi-directory=/boot", "--bootloader-id=GRUB"])
             self.run_command(["arch-chroot", "/mnt", "grub-mkconfig", "-o", "/boot/grub/grub.cfg"])
         except Exception as e:
             print(f"\033[1;31m[!] ERROR: Failed to install GRUB: {e}\033[0m", file=sys.stderr)
@@ -357,6 +433,7 @@ class Installer:
 
     def run(self):
         self.configure_pacman()
+        self.select_environment()
         self.disks()
         self.install_base()
         self.select_keyboard()
