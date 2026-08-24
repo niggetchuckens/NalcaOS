@@ -10,3 +10,6 @@ nalcaos/
 install.sh
 binaries/built/cachy-mirrors.txt
 binaries/built/download_mirror.py
+
+# python
+__pycache__

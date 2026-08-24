@@ -117,10 +117,10 @@ class Installer:
         self.run_command(["arch-chroot", "/mnt", "hwclock", "--systohc"])
         
         # Setting up locales and hostname
-        self.run_command(["arch-chroot", "/mnt", "sed", "-i", "s/#en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/", "/etc/locale.gen"])
+        self.run_command(["arch-chroot", "/mnt", "sed", "-i", f"s/#{self.locale} UTF-8/{self.locale} UTF-8/", "/etc/locale.gen"])
         self.run_command(["arch-chroot", "/mnt", "locale-gen"])
-        self.run_command("echo LANG=en_US.UTF-8 > /mnt/etc/locale.conf", shell=True)
-        self.run_command("echo KEYMAP=us > /mnt/etc/vconsole.conf", shell=True)
+        self.run_command(f"echo LANG={self.locale} > /mnt/etc/locale.conf", shell=True)
+        self.run_command(f"echo KEYMAP={self.keymap} > /mnt/etc/vconsole.conf", shell=True)
         self.run_command("echo NalcaOS > /mnt/etc/hostname", shell=True)
         
         # Setting root password and creating user
@@ -251,6 +251,26 @@ class Installer:
             print(f"\033[1;31m[!] ERROR: Failed to setup secure boot: {e}\033[0m", file=sys.stderr)
 
 
+    def select_keyboard(self):
+        keyboards = {
+            "1": ("Español", "es", "es_ES.UTF-8"),
+            "2": ("Latinoamericano", "latam", "es_LA.UTF-8"),
+            "3": ("Inglés USA", "us", "en_US.UTF-8")
+        }
+
+        print("\nSelect your keyboard layout:")
+        for key, value in keyboards.items():
+            print(f"{key}) {value[0]}")
+
+        choice = ""
+        while choice not in keyboards:
+            choice = input("Selection (1-3): ").strip()
+
+        selected = keyboards[choice]
+        self.keymap = selected[1]
+        self.locale = selected[2]
+        print(f"Keyboard set to: {selected[0]} ({self.keymap})")
+
     def install_desktop(self):
         kde_plasma = ["plasma", "sddm", "konsole", "dolphin"]
         gnome = ["gnome", "gdm"]
@@ -339,6 +359,7 @@ class Installer:
         self.configure_pacman()
         self.disks()
         self.install_base()
+        self.select_keyboard()
         self.arch_chroot()
         self.mirrors_setup()
         self.install_desktop()
