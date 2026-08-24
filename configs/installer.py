@@ -105,6 +105,25 @@ class Installer:
 
         except Exception as e:
             print(f"Warning: Could not configure pacman.conf: {e}")
+
+    def setup_initial_mirrors(self):
+        print("Setting up reliable mirrors for installation...")
+        try:
+            subprocess.run(["pacman", "-S", "--noconfirm", "reflector"], check=False)
+            
+            subprocess.run([
+                "reflector",
+                "--latest", "10",
+                "--protocol", "https",
+                "--sort", "rate",
+                "--save", "/etc/pacman.d/mirrorlist"
+            ], check=False)
+            
+            subprocess.run(["pacman", "-Syy", "--noconfirm"], check=False)
+            print("Mirrors updated successfully.")
+        except Exception as e:
+            print(f"Warning: Could not setup mirrors with reflector: {e}")
+            print("Falling back to default mirrors...")
             
     def disks(self):
         self.cleanup_mounts()
@@ -176,7 +195,18 @@ class Installer:
             pkgs = f"base linux-firmware base-devel git curl wget networkmanager sudo vim nano openssh python {cpu} {gpu} "
         
         print(f"Installing base packages: {pkgs}")
-        self.run_command(["pacstrap", "-K", "/mnt"] + pkgs.strip().split())
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                self.run_command(["pacstrap", "-K", "/mnt"] + pkgs.strip().split())
+                break
+            except SystemExit:
+                if attempt < max_retries - 1:
+                    print(f"\nRetrying installation (attempt {attempt + 2}/{max_retries})...")
+                    self.setup_initial_mirrors()
+                else:
+                    print("\nFailed to install packages after multiple attempts.")
+                    sys.exit(1)
         self.run_command("genfstab -U /mnt >> /mnt/etc/fstab", shell=True)
         
     def arch_chroot(self):
@@ -434,6 +464,7 @@ class Installer:
     def run(self):
         self.configure_pacman()
         self.select_environment()
+        self.setup_initial_mirrors()
         self.disks()
         self.install_base()
         self.select_keyboard()
